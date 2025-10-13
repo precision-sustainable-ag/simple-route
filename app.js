@@ -177,7 +177,10 @@ const setup = async ({
       }],
       css: [{
         content: `
-          .swagger-ui .topbar, .url, button.cancel {
+          .swagger-ui .topbar,
+          .url,
+          button.cancel,
+          span:last-of-type .opblock-tag-section:last-of-type {
             display: none !important;
           }
 
