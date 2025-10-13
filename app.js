@@ -45,7 +45,8 @@ const setup = async ({
 
   let ico;
   try {
-    ico = fs.readFileSync(path.join(__dirname, '../public', 'favicon.ico'));
+    // ico = fs.readFileSync(path.join(__dirname, '../public', 'favicon.ico'));
+    ico = fs.readFileSync(path.join(process.cwd(), 'public', 'favicon.ico'));
   } catch (err) {
     console.log(err.message);
   }
@@ -259,7 +260,8 @@ const setup = async ({
   });
 
   await app.register(staticPlugin, {
-    root: path.join(__dirname, '../public'),
+    // root: path.join(__dirname, '../public'),
+    root: path.join(process.cwd(), 'public'),
     prefix: '/',
     index: ['index.html'],
     list: false,
