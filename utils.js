@@ -1,5 +1,7 @@
 import { networkInterfaces } from 'os';
 
+import { routes } from './app.js';
+
 const ipAddress = () => Object.values(networkInterfaces()).flat().find(i => i && i.family === 'IPv4' && !i.internal)?.address || '127.0.0.1';
 const dberr = `Could not connect to database from ${ipAddress()}`;
 
@@ -168,18 +170,8 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
     }
   }; // simpleQuery
 
-  const route = (tag, description, props, handler, parameters = {}, opts = {}) => {
+  const route = (tag, summary, description, props, handler, parameters = {}, opts = {}) => {
     const isEmpty = props && Object.keys(props).length === 0;
-    const properties = isEmpty
-      ? undefined
-      : Object.fromEntries(
-        Object.entries(props).map(([k, v]) => [
-          k,
-          typeof v === 'string'
-            ? { type: 'string', enum: [v] }
-            : { type: 'string', ...v },
-        ]),
-      );
 
     let required = [];
     parameters = Object.fromEntries(
@@ -193,40 +185,16 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
 
     required = Object.entries(parameters)
       .filter(([, v]) => v && v.required === true)
-      .map(([k]) => k);    
+      .map(([k]) => k);
 
     for (const k of required) delete parameters[k].required;
 
     parameters.output = { type: 'string', examples: ['json', 'csv', 'html'] };
 
-    // const querystring = {
-    //   querystring: {
-    //     type: 'object',
-    //     additionalProperties: false,
-    //     properties: { ...parameters },
-    //     ...(required.length ? { required } : {})
-    //   }
-    // };
-
     const useBody = opts?.method?.toLowerCase() === 'post';
     const bodyProps  = parameters;           // e.g., points
     const queryProps = opts?.query || {};    // e.g., output (optional)
    
-    const successSchema = opts.response ?? (
-      Object.keys(props).length === 1
-        ? { type: 'array' }
-        : isEmpty
-          ? { type: 'array', items: { type: 'object', additionalProperties: true } }
-          : {
-            type: 'array',
-            additionalProperties: false,
-            items: {
-              // additionalProperties: true,
-              properties,
-            },
-          }
-    );
-
     const schemaBlock = useBody
       ? {
         body: {
@@ -245,7 +213,49 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
         },
       };
 
-    const response = {
+    const properties = isEmpty
+      ? undefined
+      : (
+        Object.fromEntries(
+          Object.entries(props).map(([k, v]) => [
+            k,
+            typeof v === 'string'
+              ? { type: 'string', enum: [v] }
+              : { type: 'string', ...v },
+          ]),
+        )
+      );
+
+    if (opts[200] && !opts.response) {
+      opts.response = {};
+      if (opts[200].items) {
+        opts.response[200] = opts[200];
+      } else {
+        opts.response[200] = {
+          type: 'array',
+          items: {
+            additionalProperties: false,
+            properties: { ...opts[200] },
+          },
+        };
+      }
+    }
+
+    const successSchema = opts.response ?? (
+      Object.keys(props).length === 1 || opts.array
+        ? { type: 'array' }
+        : isEmpty
+          ? { type: 'array', items: { type: 'object', additionalProperties: true } }
+          : {
+            type: 'array',
+            additionalProperties: false,
+            items: {
+              properties,
+            },
+          }
+    );
+
+    const response = opts.response ?? {
       200: successSchema,
       503: {
         type: 'object',
@@ -254,13 +264,15 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
         properties: { error: { type: 'string', enum: [dberr] }},
       },
     };
+    // console.log(JSON.stringify(response, null, 2));
+    // console.log('_'.repeat(80));
 
     return {
       schema: {
         tags: [tag],
+        summary,
         description,
-        summary: opts.summary || '',
-        response: opts.response || response,
+        response,
         security: [{ ApiKeyAuth: [] }],
         ...schemaBlock,
         ...(useBody && Object.keys(queryProps).length
@@ -304,7 +316,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
     };
   }; // route
 
-  return async function simpleRoute(routeName, tag, description, query, parms, opts) {
+  return async function simpleRoute(routeName, tag, summary, query, parms, opts) {
     const useBody = opts?.method?.toLowerCase() === 'post';
 
     if (Array.isArray(parms)) {
@@ -323,7 +335,8 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
       await app[opts?.method || 'get'](routeName,
         route(
           tag,
-          description,
+          summary,
+          routes[routeName] ?? summary,
           inputSchema,
           (req, reply) => {
             // handle missing inputs, case-sensitivity, and parameterized routes
@@ -351,7 +364,8 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
       await app[opts?.method || 'get'](routeName,
         route(
           tag,
-          description,
+          summary,
+          routes[routeName] ?? summary,
           await props(query, parms, opts?.db),
           (req) => {
             const src = useBody ? (req.body ?? {}) : (req.query ?? {});

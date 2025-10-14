@@ -1,17 +1,18 @@
 import { networkInterfaces } from 'os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
 import staticPlugin from '@fastify/static';
+import { load } from 'cheerio';
 
 import { pool } from './db.js';
 
 let app;
+let routes = {};
 
 const setup = async ({
   title = 'Swagger API',
@@ -31,8 +32,6 @@ const setup = async ({
     },
   });
 
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
   const ipAddress = () => Object.values(networkInterfaces()).flat().find(i => i && i.family === 'IPv4' && !i.internal)?.address || '127.0.0.1';
 
   const dberr = `Could not connect to database from ${ipAddress()}`;
@@ -42,6 +41,19 @@ const setup = async ({
     allowedHeaders: ['content-type', 'x-api-key', 'authorization'],
     credentials: true,
   });
+
+  try {
+    const html = fs.readFileSync(path.join(process.cwd(), 'public', 'routes.html'), 'utf8');
+    const $ = load(html);
+    routes = Object.fromEntries(
+      $('[data-route]').toArray().map(el => [
+        el.attribs['data-route'],
+        $(el).html()?.trim() ?? '',
+      ]),
+    );
+  } catch (err) {
+    void err;
+  }
 
   let ico;
   try {
@@ -287,4 +299,4 @@ const setup = async ({
   console.log(`Redoc Docs: http://localhost:${port}/redoc`);
 }; // setup
 
-export { app, setup };
+export { app, setup, routes };
