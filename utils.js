@@ -161,10 +161,12 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
     }
   }; // props
 
-  const simpleQuery = async (query, parms) => {
+  const simpleQuery = async (query, parms, opts = {}) => {
     const { fields, rows } = await db.query(query, parms);
-    if (fields.length === 1) {
+    if (opts.array) {
       return rows.map((row) => row[fields[0].name]);
+    } else if (opts.object) {
+      return rows[0][fields[0].name];
     } else {
       return rows;
     }
@@ -241,15 +243,32 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
       }
     }
 
+    if (opts.array && !opts[200] && !opts.response) {
+      opts.response = {
+        200: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      };
+    }
+
+    if (opts.object && !opts[200] && !opts.response) {
+      opts.response = {
+        200: {
+          type: 'object',
+          additionalProperties: true,
+        },
+      };
+    }    
     const successSchema = opts.response ?? (
-      Object.keys(props).length === 1 || opts.array
+      opts.array
         ? { type: 'array' }
         : isEmpty
           ? { type: 'array', items: { type: 'object', additionalProperties: true } }
           : {
             type: 'array',
-            additionalProperties: false,
             items: {
+              additionalProperties: true,
               properties,
             },
           }
@@ -384,6 +403,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
                   return '';
                 }
               }),
+              opts,
             );
           },
           parms,
