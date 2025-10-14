@@ -234,7 +234,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
         opts.response[200] = {
           type: 'array',
           items: {
-            additionalProperties: false,
+            additionalProperties: true,
             properties: { ...opts[200] },
           },
         };
