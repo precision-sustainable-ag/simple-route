@@ -110,61 +110,74 @@ const setup = async ({
       },
       onComplete: () => {
         const click = async (e) => {
-          if (e?.target.classList.contains('execute')) {
+          async function openResultInWindow(url, key, path) {
+            const res = await fetch(url, { headers: { 'x-api-key': key } });
+            const isHtmlOrCsv = /output=(html|csv)/.test(url);
+            const text = isHtmlOrCsv ? await res.text() : JSON.stringify(await res.json(), null, 2);
+
+            const w = window.open('about:blank', '_blank');
+            if (!w) {
+              alert('Popup blocked. Allow popups for this site.');
+              return;
+            }
+            w.opener = null;
+
+            const style = `
+              <style>
+                #Close { position: fixed; top: 0; right: 0; background: #cde; }
+                body { margin: 0; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+                pre { white-space: pre-wrap; word-break: break-word; padding: 12px 12px 24px; }
+                header { padding: 8px 12px; background: #f6f8fa; border-bottom: 1px solid #e5e7eb; }
+                .status { font-weight: 600; }
+                a { padding: 0.5rem; font-weight: bold; }
+              </style>
+            `;
+
+            const html = `
+              <!doctype html>
+              <html>
+                <head>
+                  <meta charset="utf-8">
+                  <title>Result</title>
+                  ${style}
+                </head>
+                <body>
+                  <button id="Close" accesskey="l">C<u>l</u>ose</button>
+                  <div>
+                    <a href="${path}">${path}</a>
+                  </div>
+                  <header><span class="status">Status: ${res.status}</span></header>
+                  <pre>${text}</pre>
+                </body>
+              </html>
+            `;
+
+            w.document.open();
+            w.document.write(html);
+            w.document.close();
+
+            const closeBtn = w.document.getElementById('Close');
+            if (closeBtn) closeBtn.addEventListener('click', () => w.close());
+            w.document.addEventListener('keydown', (evt) => {
+              if (evt.key === 'Escape') w.close();
+            });
+            w.focus();
+          } // openResultInWindow
+
+          if (e?.target.classList.contains('execute') && e.ctrlKey) {
             const current =  e?.target.closest('.opblock');
             if (current.querySelector('.opblock-summary-method').textContent !== 'GET') {
               return;
             }
 
-            let iframe = document.querySelector('iframe[data-runner="1"]');
-            if (!iframe) {
-              iframe = document.createElement('iframe');
-              iframe.setAttribute('data-runner', '1');
-              iframe.sandbox = 'allow-scripts allow-same-origin';
-              document.body.appendChild(iframe);
-            }
-
-            iframe.addEventListener('load', () => {
-              const doc = iframe.contentDocument;
-              doc.querySelector('#Close').addEventListener('click', () => iframe.remove());
-
-              doc.addEventListener('keydown', (evt) => {
-                if (evt.key === 'Escape') {
-                  iframe.remove();
-                }
-              });
-
-              iframe.focus();
-            });  
-
-            const res = await fetch(url, { headers: { 'x-api-key': key } });
-
-            const style = `
-              <style>
-                #Close {
-                  position: fixed;
-                  top: 0;
-                  right: 0;
-                  background: #cde;
-                }
-              </style>
-            `;
-
-            if (/output=(html|csv)/.test(url)) {
-              const text = await res.text();
-              iframe.srcdoc = `
-                ${style}
-                <button id="Close" accesskey="l">C<u>l</u>ose</button>
-                <pre>Status: ${res.status}\n\n${text}</pre>
-              `;
-            } else {
-              const text = await res.json();
-              iframe.srcdoc = `
-                ${style}
-                <button id="Close" accesskey="l">C<u>l</u>ose</button>
-                <pre>Status: ${res.status}\n\n${JSON.stringify(text, null, 2)}</pre>
-              `;
-            }
+            const timer = setInterval(async () => {
+              const curl = document.querySelector('pre.curl');
+              if (curl) {
+                clearInterval(timer);
+                const path = curl.textContent.split('\\')[1].trim().slice(1, -1);
+                await openResultInWindow(url, key, path);
+              }
+            }, 50);
           } else {
             setTimeout(() => {
               const current =  e?.srcElement.closest('.opblock-summary');
