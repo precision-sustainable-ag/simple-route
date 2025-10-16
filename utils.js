@@ -128,39 +128,47 @@ const html = (out, opts) => {
 
 const desc = (s) => s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
 
-const makeSimpleRoute = (app, db, pluginOpts = {}) => {
-  const props = async (query, parms) => {
-    try {
-      let results;
-      if (/\$[1-9]/.test(query) && Object.keys(parms).length === 0) {
-        query = query.replace(/\$[1-9]/g, `''`);
-      }
-
-      if (parms) {
-        const p = Object.keys(parms).map((parm) => {
-          if (parms[parm].type === 'array') return [];
-          if (parms[parm].format === 'date') return '2000-01-01';
-          return '';
-        });
-
-        results = await db.query(
-          `${query} LIMIT 0`,
-          p,
-        );
-      } else {
-        results = await db.query(`${query} LIMIT 0`);
-      }
-
-      const out = {};
-      for (const f of results.fields) {
-        out[f.name] = pgTypeToJson(f.dataTypeID);
-      }
-      return out;
-    } catch(err) {
-      console.log('props:', err.message, err.stack);
+const props = async (db, query, parms) => {
+  try {
+    let results;
+    if (/\$[1-9]/.test(query) && Object.keys(parms).length === 0) {
+      query = query.replace(/\$[1-9]/g, `''`);
     }
-  }; // props
 
+    if (parms) {
+      const p = Object.keys(parms).map((parm) => {
+        if (parms[parm].type === 'array') return [];
+        if (parms[parm].format === 'date') return '2000-01-01';
+        return '';
+      });
+
+      results = await db.query(
+        `${query} LIMIT 0`,
+        p,
+      );
+    } else {
+      results = await db.query(`${query} LIMIT 0`);
+    }
+
+    const out = {};
+    for (const f of results.fields) {
+      out[f.name] = pgTypeToJson(f.dataTypeID);
+    }
+    return out;
+  } catch(err) {
+    console.log('props:', err.message, err.stack);
+  }
+}; // props
+
+const schema200 = async (pool, query) => ({
+  200: {
+    items: {
+      properties: await props(pool, query),
+    },
+  },
+});
+
+const makeSimpleRoute = (app, db, pluginOpts = {}) => {
   const simpleQuery = async (query, parms, opts = {}) => {
     const { fields, rows } = await db.query(query, parms);
     if (opts.array) {
@@ -385,7 +393,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
           tag,
           summary,
           routes[routeName] ?? summary,
-          await props(query, parms, opts?.db),
+          await props(db, query, parms, opts?.db),
           (req) => {
             const src = useBody ? (req.body ?? {}) : (req.query ?? {});
             return simpleQuery(
@@ -414,6 +422,4 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
   };
 }; // makeSimpleRoute
 
-export {
-  makeSimpleRoute,
-}
+export { makeSimpleRoute, props, schema200 };
