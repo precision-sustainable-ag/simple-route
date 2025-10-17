@@ -207,7 +207,9 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
 
     for (const k of required) delete parameters[k].required;
 
-    parameters.output = { type: 'string', examples: ['json', 'csv', 'html'] };
+    if (!opts.object) {
+      parameters.output = { type: 'string', examples: ['json', 'csv', 'html'] };
+    }
 
     const useBody = opts?.method?.toLowerCase() === 'post';
     const bodyProps  = parameters;           // e.g., points
