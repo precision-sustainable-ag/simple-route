@@ -171,7 +171,7 @@ const setup = async ({
             }
 
             const timer = setInterval(async () => {
-              const curl = document.querySelector('pre.curl');
+              const curl = current.querySelector('pre.curl');
               if (curl) {
                 clearInterval(timer);
                 const path = curl.textContent.split('\\')[1].trim().slice(1, -1);

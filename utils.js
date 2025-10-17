@@ -79,7 +79,7 @@ const html = (out, opts) => {
       }
 
       a {
-        position: absolute;
+        /* position: absolute; */
         z-index: 1000;
       }
     </style>
@@ -137,17 +137,25 @@ const props = async (db, query, parms) => {
 
     if (parms) {
       const p = Object.keys(parms).map((parm) => {
-        if (parms[parm].type === 'array') return [];
-        if (parms[parm].format === 'date') return '2000-01-01';
-        return '';
+        if (parms[parm].type === 'array') {
+          return [];
+        } else if (parms[parm].format === 'date') {
+          return '2000-01-01';
+        } else if (parms[parm].type === 'number') {
+          return parms[parm].examples?.[0] ?? 0;
+        } else if (parms[parm].type === 'boolean') {
+          return true;
+        } else {
+          return '';
+        }
       });
 
       results = await db.query(
-        `${query} LIMIT 0`,
+        `${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 0`,
         p,
       );
     } else {
-      results = await db.query(`${query} LIMIT 0`);
+      results = await db.query(`${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 0`);
     }
 
     const out = {};
@@ -174,7 +182,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
     if (opts.array) {
       return rows.map((row) => row[fields[0].name]);
     } else if (opts.object) {
-      return rows[0][fields[0].name];
+      return rows[0];
     } else {
       return rows;
     }
@@ -204,7 +212,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
     const useBody = opts?.method?.toLowerCase() === 'post';
     const bodyProps  = parameters;           // e.g., points
     const queryProps = opts?.query || {};    // e.g., output (optional)
-   
+
     const schemaBlock = useBody
       ? {
         body: {
@@ -267,7 +275,8 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
           additionalProperties: true,
         },
       };
-    }    
+    }
+    
     const successSchema = opts.response ?? (
       opts.array
         ? { type: 'array' }
@@ -276,7 +285,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
           : {
             type: 'array',
             items: {
-              additionalProperties: true,
+              additionalProperties: false, // !!!
               properties,
             },
           }
@@ -405,6 +414,8 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
                   return req.params[parm];
                 } else if (parms[parm].type === 'array') {
                   return [];
+                } else if (parms[parm].type === 'boolean') {
+                  return false;
                 } else if (parms[parm].format === 'date') {
                   return null;
                 } else {
