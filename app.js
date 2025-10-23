@@ -112,7 +112,8 @@ const setup = async ({
         const click = async (e) => {
           async function openResultInWindow(url, key, path) {
             const res = await fetch(url, { headers: { 'x-api-key': key } });
-            const isHtmlOrCsv = /output=(html|csv)/.test(url);
+            const ct = (res.headers.get('content-type') || '').toLowerCase();
+            const isHtmlOrCsv = /output=(html|csv)/.test(url) || /csv|html/.test(ct);
             const text = isHtmlOrCsv ? await res.text() : JSON.stringify(await res.json(), null, 2);
 
             const w = window.open('about:blank', '_blank');

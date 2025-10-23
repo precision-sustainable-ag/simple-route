@@ -5,7 +5,7 @@ import { routes } from './app.js';
 const ipAddress = () => Object.values(networkInterfaces()).flat().find(i => i && i.family === 'IPv4' && !i.internal)?.address || '127.0.0.1';
 const dberr = `Could not connect to database from ${ipAddress()}`;
 
-const pgTypeToJson = (oid) => {
+const pgTypeToJson = (oid, data) => {
   switch (oid) {
     case 16:   return { type: 'boolean' };                            // bool
     case 20:                                                          // int8
@@ -21,7 +21,10 @@ const pgTypeToJson = (oid) => {
     case 1114:                                                        // timestamp
     case 1184: return { type: 'string', format: 'date-time' };        // timestamptz
     case 114:                                                         // json
-    case 3802: return { type: 'object', additionalProperties: true }; // jsonb
+    case 3802:                                                        // jsonb
+      return Array.isArray(data)
+        ? { type: 'array', example: [] }
+        : { type: 'object', additionalProperties: true }
     case 1007: return { type: 'array', items: { type: 'integer' } };  // _int4
     case 1009:                                                        // _text
     case 1015: return { type: 'array', items: { type: 'string' } };   // _varchar
@@ -151,16 +154,16 @@ const props = async (db, query, parms) => {
       });
 
       results = await db.query(
-        `${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 0`,
+        `${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 1`,
         p,
       );
     } else {
-      results = await db.query(`${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 0`);
+      results = await db.query(`${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 1`);
     }
 
     const out = {};
     for (const f of results.fields) {
-      out[f.name] = pgTypeToJson(f.dataTypeID);
+      out[f.name] = pgTypeToJson(f.dataTypeID, results.rows[0]?.[f.name]);
     }
     return out;
   } catch(err) {
@@ -207,7 +210,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
 
     for (const k of required) delete parameters[k].required;
 
-    if (!opts.object) {
+    if (!opts.object && !opts.array && !opts.html) {
       parameters.output = { type: 'string', examples: ['json', 'csv', 'html'] };
     }
 
@@ -270,27 +273,55 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
       };
     }
 
+    const entries = [
+      ['strings', { type: 'string' }],
+      ['arrays',  { type: 'array' }],
+      ['numbers', { type: 'number' }],
+      ['dates',   { type: 'string', format: 'date' }],
+    ];
+
+    const hasAny = entries.some(([k]) => opts?.[k]);
+
+    const items = hasAny
+      ? {
+        properties: entries.reduce((props, [k, schema]) => {
+          for (const name of opts?.[k] ?? []) props[name] = schema;
+          return props;
+        }, {}),
+      }
+      : { additionalProperties: true };    
+
     if (opts.object && !opts[200] && !opts.response) {
       opts.response = {
         200: {
           type: 'object',
-          additionalProperties: true,
+          additionalProperties: isEmpty,
+          properties: { ...properties },
         },
       };
+      
+      if (hasAny) {
+        opts.response[200].properties = { ...items.properties };
+        opts.response[200].additionalProperties = false;
+      }
     }
-    
+
     const successSchema = opts.response ?? (
       opts.array
         ? { type: 'array' }
-        : isEmpty
-          ? { type: 'array', items: { type: 'object', additionalProperties: true } }
-          : {
-            type: 'array',
-            items: {
-              additionalProperties: false, // !!!
-              properties,
-            },
-          }
+        : hasAny
+          ? { type: 'array', items }
+          : isEmpty
+            ? { type: 'array', items: { type: 'object', additionalProperties: true } }
+            : {
+              type: 'array',
+              items: {
+                additionalProperties: false, // !!!
+                properties: {
+                  ...properties,
+                },
+              },
+            }
     );
 
     const response = opts.response ?? {
@@ -302,8 +333,6 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
         properties: { error: { type: 'string', enum: [dberr] }},
       },
     };
-    // console.log(JSON.stringify(response, null, 2));
-    // console.log('_'.repeat(80));
 
     return {
       schema: {
@@ -331,7 +360,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
         let out = await handler(req, reply);
         if (out === undefined) out = props;
 
-        if (opts?.respondAsHtmlWhen?.(req)) {
+        if (opts.html || opts?.respondAsHtmlWhen?.(req)) {
           reply.type('text/html');
           return out;
         } else if (req.query?.output === 'html' && Array.isArray(out)) {
@@ -375,7 +404,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
           tag,
           summary,
           routes[routeName] ?? summary,
-          inputSchema,
+          {},
           (req, reply) => {
             // handle missing inputs, case-sensitivity, and parameterized routes
             const src = useBody ? (req.body ?? {}) : (req.query ?? {});
