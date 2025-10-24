@@ -14,6 +14,7 @@ const pgTypeToJson = (oid, data) => {
     case 700:                                                         // float4
     case 701:                                                         // float8
     case 1700: return { type: 'number' };                             // numeric
+    case 19:                                                          // name
     case 25:                                                          // text
     case 1042:                                                        // char
     case 1043: return { type: 'string' };                             // varchar
@@ -28,6 +29,7 @@ const pgTypeToJson = (oid, data) => {
     case 1007: return { type: 'array', items: { type: 'integer' } };  // _int4
     case 1009:                                                        // _text
     case 1015: return { type: 'array', items: { type: 'string' } };   // _varchar
+    case 869:  return { type: 'string', format: 'ipv4' };             // inet
     default: console.log('unknown oid', oid); return { type: 'string' };   // fallback
   }
 };
@@ -154,11 +156,22 @@ const props = async (db, query, parms) => {
       });
 
       results = await db.query(
-        `${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 1`,
+        `${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 0`,
         p,
       );
+
+      if (results.fields.find((field) => field.dataTypeID === 3802)) { // jsonb
+        results = await db.query(
+          `${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 1`,
+          p,
+        );
+      }
     } else {
-      results = await db.query(`${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 1`);
+      results = await db.query(`${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 0`);
+  
+      if (results.fields.find((field) => field.dataTypeID === 3802)) { // jsonb
+        results = await db.query(`${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 1`);
+      }
     }
 
     const out = {};
