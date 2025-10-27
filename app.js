@@ -44,9 +44,14 @@ const setup = async ({
 
   try {
     const html = fs.readFileSync(path.join(process.cwd(), 'public', 'routes.html'), 'utf8');
-    const $ = load(html);
+    const $ = load(
+      html
+        .replace(/\$ANCHOR\[(.+)\]/g, (_, c) => `<a target="_blank" href="${c}">${c}</a>`),
+      // .replace(/\$PATH/g, '?????'),
+    );
+    
     routes = Object.fromEntries(
-      $('[data-route]').toArray().map(el => [
+      $('[data-route]').toArray().map((el) => [
         el.attribs['data-route'],
         $(el).html()?.trim() ?? '',
       ]),
@@ -245,46 +250,49 @@ const setup = async ({
   }
 
   app.get('/redoc', async (req, reply) => {
-    // Use a relative spec-url so this works behind proxies and on any host
-    const html = `<!doctype html>
-  <html>
-    <head>
-      <meta charset="utf-8"/>
-      <title>API Docs Redoc</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1"/>
-      <style>
-        body { margin:0; padding:0; }
-        .topbar {
-          position: fixed; z-index: 10; top: 0; left: 0; right: 0;
-          height: 44px; display: flex; align-items: center; gap: 12px;
-          padding: 0 12px; border-bottom: 1px solid #eee; background: #fff;
-          font: 500 14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
-        }
-        .content { margin-top: 44px; }
-        .btn { padding: 6px 10px; border: 1px solid #ddd; border-radius: 8px; text-decoration: none; color: #111; }
-        ul[role="menu"] > li:last-of-type { display: none; }  /* hide redoc route in left pane */
-        div[data-section-id]:last-of-type { display: none; }  /* hide redoc route in middle pane */
-      </style>
-    </head>
-    <body>
-      <div class="topbar">
-        <span>Redoc</span>
-        <a class="btn" href="/docs">Try it (Swagger UI)</a>
-        <a class="btn" href="/docs/json">OpenAPI JSON</a>
-      </div>
-      <div class="content">
-        <redoc
-          spec-url="/docs/json"
-          suppress-warnings
-          hide-download-button
-          expand-responses=""
-          path-in-middle-panel
-        >
-        </redoc>
-      </div>
-      <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
-    </body>
-  </html>`;
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <link rel="icon" href="/favicon.ico">
+          <meta charset="utf-8"/>
+          <title>API Docs Redoc</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1"/>
+          <style>
+            body { margin:0; padding:0; }
+            .topbar {
+              position: fixed; z-index: 10; top: 0; left: 0; right: 0;
+              height: 44px; display: flex; align-items: center; gap: 12px;
+              padding: 0 12px; border-bottom: 1px solid #eee; background: #fff;
+              font: 500 14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            }
+            .content { margin-top: 44px; }
+            .btn { padding: 6px 10px; border: 1px solid #ddd; border-radius: 8px; text-decoration: none; color: #111; }
+            ul[role="menu"] > li:last-of-type { display: none; }  /* hide redoc route in left pane */
+            div[data-section-id]:last-of-type { display: none; }  /* hide redoc route in middle pane */
+          </style>
+        </head>
+        <body>
+          <div class="topbar">
+            <span>Redoc</span>
+            <a class="btn" href="/docs">Try it (Swagger UI)</a>
+            <a class="btn" href="/docs/json">OpenAPI JSON</a>
+          </div>
+          <div class="content">
+            <redoc
+              spec-url="/docs/json"
+              suppress-warnings
+              hide-download-button
+              expand-responses=""
+              path-in-middle-panel
+            >
+            </redoc>
+          </div>
+          <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+        </body>
+      </html>
+    `;
+
     reply.type('text/html').send(html);
   });
 

@@ -404,7 +404,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
     }
 
     if (typeof query === 'function') {
-      const inputs = query.toString().split('(')[1].split(')')[0].split(/\s*,\s*/).filter((s) => s);
+      const inputs = query.toString().split('(')[1].split(')')[0].split(/\s*,\s*/).filter((s) => s).map((s) => s.trim());
       const inputSchema = {};
       if (!routeName.includes(':')) {
         for (const f of inputs.filter((input) => input !== 'req' && input !== 'reply')) {
