@@ -19,6 +19,7 @@ const setup = async ({
   version = '1.0.0',
   trusted = [],
   plugins = {},
+  preValidation,
 }) => {
   app = Fastify({
     logger: false,
@@ -32,6 +33,10 @@ const setup = async ({
     },
   });
 
+  if (preValidation) {
+    app.addHook('preValidation', preValidation);
+  }
+  
   const ipAddress = () => Object.values(networkInterfaces()).flat().find(i => i && i.family === 'IPv4' && !i.internal)?.address || '127.0.0.1';
 
   const dberr = `Could not connect to database from ${ipAddress()}`;
@@ -46,7 +51,16 @@ const setup = async ({
     const html = fs.readFileSync(path.join(process.cwd(), 'public', 'routes.html'), 'utf8');
     const $ = load(
       html
-        .replace(/\$ANCHOR\[(.+)\]/g, (_, c) => `<a target="_blank" href="${c}">${c}</a>`),
+        .replace(/\$ANCHOR\[(.+)\]/g, (_, c) => {
+          const cs = c.replace(/(\w+=)/g, (_, c) => `<em style="color: brown">${c}</em>`);
+          return `
+            <div style="white-space: nowrap; overflow: auto;">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              <strong><a target="_blank" href="${c}">${cs}</a></strong>
+            </div>
+          `;
+        })
+        .replace(/\s*[\n\r]+/g, '\r'),  // Redoc doesn't like blank rows
       // .replace(/\$PATH/g, '?????'),
     );
     
@@ -57,7 +71,7 @@ const setup = async ({
       ]),
     );
   } catch (err) {
-    void err;
+    console.log(err);
   }
 
   let ico;
@@ -238,6 +252,10 @@ const setup = async ({
               border: 1px solid rgba(38, 50, 56, 0.1);
               padding: 0px 5px !important;
               font-size: 13px !important;
+            }
+
+            li em {
+              color: brown;
             }
           }
         `,
