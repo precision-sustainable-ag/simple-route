@@ -47,29 +47,38 @@ const setup = async ({
     credentials: true,
   });
 
+  const cleanHTML = (s) => (
+    s
+      .replace(/\$ANCHOR\[(.+)\]/g, (_, c) => {
+        const cs = c.replace(/(\w+=)/g, (_, c) => `<em style="color: brown">${c}</em>`);
+        return `
+          <div style="white-space: nowrap; overflow: auto;">
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <strong><a target="_blank" href="${c}">${cs}</a></strong>
+          </div>
+        `;
+      })
+      .replace(/\s*[\n\r]+/g, '\r')  // Redoc doesn't like blank rows
+    // .replace(/\$PATH/g, '?????'),
+  );
+
   try {
     const html = fs.readFileSync(path.join(process.cwd(), 'public', 'routes.html'), 'utf8');
-    const $ = load(
-      html
-        .replace(/\$ANCHOR\[(.+)\]/g, (_, c) => {
-          const cs = c.replace(/(\w+=)/g, (_, c) => `<em style="color: brown">${c}</em>`);
-          return `
-            <div style="white-space: nowrap; overflow: auto;">
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <strong><a target="_blank" href="${c}">${cs}</a></strong>
-            </div>
-          `;
-        })
-        .replace(/\s*[\n\r]+/g, '\r'),  // Redoc doesn't like blank rows
-      // .replace(/\$PATH/g, '?????'),
-    );
-    
+    const $ = load(cleanHTML(html));
+
     routes = Object.fromEntries(
       $('[data-route]').toArray().map((el) => [
         el.attribs['data-route'],
         $(el).html()?.trim() ?? '',
       ]),
     );
+  } catch (err) {
+    console.log(err);
+  }
+
+  let description;
+  try {
+    description = cleanHTML(fs.readFileSync(path.join(process.cwd(), 'public', 'description.html'), 'utf8'));
   } catch (err) {
     console.log(err);
   }
@@ -95,7 +104,7 @@ const setup = async ({
   await app.register(swagger, {
     mode: 'dynamic',
     openapi: {
-      info: { title, version },
+      info: { title, version, description },
       components: {
         securitySchemes: {
           ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'x-api-key' },
@@ -288,6 +297,12 @@ const setup = async ({
             .btn { padding: 6px 10px; border: 1px solid #ddd; border-radius: 8px; text-decoration: none; color: #111; }
             ul[role="menu"] > li:last-of-type { display: none; }  /* hide redoc route in left pane */
             div[data-section-id]:last-of-type { display: none; }  /* hide redoc route in middle pane */
+
+            .api-content > div { padding: 0; }
+            .api-content > div[id^=tag] h2 {
+              background: #f4f4f4;
+              padding: 0.5rem;
+            }
           </style>
         </head>
         <body>

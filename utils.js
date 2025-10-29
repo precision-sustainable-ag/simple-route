@@ -35,100 +35,104 @@ const pgTypeToJson = (oid, data) => {
 };
 
 const html = (out, opts) => {
-  return (`
-    <style>
-      table {
-        font: 13px arial;
-        border: 1px solid black;
-        border-spacing: 0; 
-        empty-cells: show;
-        overflow: hidden;
-      }
+  if (!out.length) {
+    return 'No data found';
+  } else {
+    return (`
+      <style>
+        table {
+          font: 13px arial;
+          border: 1px solid black;
+          border-spacing: 0; 
+          empty-cells: show;
+          overflow: hidden;
+        }
 
-      tr {
-        vertical-align: top;
-      }
+        tr {
+          vertical-align: top;
+        }
 
-      td, th {
-        padding: 0.2em 0.5em;
-        border-right: 1px solid #ddd;
-        border-bottom: 1px solid #bbb;
-        white-space: nowrap;
-      }
+        td, th {
+          padding: 0.2em 0.5em;
+          border-right: 1px solid #ddd;
+          border-bottom: 1px solid #bbb;
+          white-space: nowrap;
+        }
 
-      th {
-        background: #eee;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        border-bottom: 1px solid #aaa;
-      }
+        th {
+          background: #eee;
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          border-bottom: 1px solid #aaa;
+        }
 
-      tr.even {
-        background: #efc;
-      }
+        tr.even {
+          background: #efc;
+        }
 
-      td:nth-child(1)[rowspan] {
-        position: relative;
-      }
+        td:nth-child(1)[rowspan] {
+          position: relative;
+        }
 
-      tr.even td:nth-child(1)::before {
-        content: '';
-        position: absolute;
-        height: 100%;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        outline: 1px solid #666;
-        z-index: 999;
-      }
+        tr.even td:nth-child(1)::before {
+          content: '';
+          position: absolute;
+          height: 100%;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          outline: 1px solid #666;
+          z-index: 999;
+        }
 
-      a {
-        /* position: absolute; */
-        z-index: 1000;
-      }
-    </style>
+        a {
+          /* position: absolute; */
+          z-index: 1000;
+        }
+      </style>
 
-    <table id="Data">
-      <thead>
-        <tr><th>${Object.keys(out[0]).join('<th>')}</tr>
-      </thead>
-      <tbody>
-        ${out.map((r) => `<tr><td>${Object.keys(r).map((v) => r[v]).join('<td>')}`).join('\n')}
-      </tbody>
-    </table>
+      <table id="Data">
+        <thead>
+          <tr><th>${Object.keys(out[0]).join('<th>')}</tr>
+        </thead>
+        <tbody>
+          ${out.map((r) => `<tr><td>${Object.keys(r).map((v) => r[v]).join('<td>')}`).join('\n')}
+        </tbody>
+      </table>
 
-    ${opts.rowspan ? `
-      <script>
-        const data = document.querySelector('#Data tbody');
-        let cname = 'odd';
-        [...data.rows].forEach((r1, i) => {
-          for (let n = 0; n < data.rows[0].cells.length; n++) {
-            if (n === 0 && r1.cells[0].style.display) continue;
+      ${opts.rowspan ? `
+        <script>
+          const data = document.querySelector('#Data tbody');
+          let cname = 'odd';
+          [...data.rows].forEach((r1, i) => {
+            for (let n = 0; n < data.rows[0].cells.length; n++) {
+              if (n === 0 && r1.cells[0].style.display) continue;
 
-            if (n === 0 && !r1.className) r1.classList.add(cname);
+              if (n === 0 && !r1.className) r1.classList.add(cname);
 
-            for (let j = i + 1; j < data.rows.length; j++) {
-              if ((n > 0) && (j - i + 1 > (r1.cells[0].rowSpan || 1))) {
-                break;
+              for (let j = i + 1; j < data.rows.length; j++) {
+                if ((n > 0) && (j - i + 1 > (r1.cells[0].rowSpan || 1))) {
+                  break;
+                }
+                const r2 = data.rows[j];
+                if (r1?.cells[n]?.innerText === r2?.cells[n]?.innerText) {
+                  if (n === 0) r2.classList.add(cname);
+                  r1.cells[n].rowSpan = j - i + 1;
+                  r2.cells[n].style.display = 'none';
+                } else {
+                  break;
+                }
               }
-              const r2 = data.rows[j];
-              if (r1?.cells[n]?.innerText === r2?.cells[n]?.innerText) {
-                if (n === 0) r2.classList.add(cname);
-                r1.cells[n].rowSpan = j - i + 1;
-                r2.cells[n].style.display = 'none';
-              } else {
-                break;
+              
+              if ((n === 0) && !r1.cells[0].style.display) {
+                cname = cname === 'odd' ? 'even' : 'odd';
               }
             }
-            
-            if ((n === 0) && !r1.cells[0].style.display) {
-              cname = cname === 'odd' ? 'even' : 'odd';
-            }
-          }
-        });
-      </script>` : ''}
-  `);
+          });
+        </script>` : ''}
+    `);
+  }
 }; // html
 
 const desc = (s) => s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
