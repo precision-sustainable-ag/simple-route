@@ -302,11 +302,20 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
     const items = hasAny
       ? {
         properties: entries.reduce((props, [k, schema]) => {
-          for (const name of opts?.[k] ?? []) props[name] = schema;
+          for (const name of opts?.[k] ?? []) {
+            props[name] = schema;
+          }
           return props;
         }, {}),
       }
-      : { additionalProperties: true };    
+      : { additionalProperties: true };
+
+    if (opts.other) {
+      items.properties = {
+        ...items.properties,
+        ...opts.other,
+      }
+    }
 
     if (opts.object && !opts[200] && !opts.response) {
       opts.response = {
@@ -317,7 +326,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
         },
       };
       
-      if (hasAny) {
+      if (hasAny || opts.other) {
         opts.response[200].properties = { ...items.properties };
         opts.response[200].additionalProperties = false;
       }

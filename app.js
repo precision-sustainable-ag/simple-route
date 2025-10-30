@@ -109,7 +109,7 @@ const setup = async ({
         securitySchemes: {
           ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'x-api-key' },
         },
-      },    
+      },
     },
     exposeRoute: true,
   });
