@@ -2,6 +2,7 @@ import { networkInterfaces } from 'os';
 
 import { routes } from './app.js';
 
+const GLOBAL_ERROR = [];
 const ipAddress = () => Object.values(networkInterfaces()).flat().find(i => i && i.family === 'IPv4' && !i.internal)?.address || '127.0.0.1';
 const dberr = `Could not connect to database from ${ipAddress()}`;
 
@@ -184,7 +185,7 @@ const props = async (db, query, parms) => {
     }
     return out;
   } catch(err) {
-    console.log('props:', err.message, err.stack);
+    GLOBAL_ERROR.push(err);
   }
 }; // props
 
@@ -410,84 +411,87 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
   }; // route
 
   return async function simpleRoute(routeName, tag, summary, query, parms, opts) {
-    const useBody = opts?.method?.toLowerCase() === 'post';
-
-    if (Array.isArray(parms)) {
-      parms = Object.fromEntries(parms.map(k => [k, {}]));
-    }
-
-    if (typeof query === 'function') {
-      const inputs = query.toString().split('(')[1].split(')')[0].split(/\s*,\s*/).filter((s) => s).map((s) => s.trim());
-      const inputSchema = {};
-      if (!routeName.includes(':')) {
-        for (const f of inputs.filter((input) => input !== 'req' && input !== 'reply')) {
-          inputSchema[f] = 'string';
-        }
+    try {
+      const useBody = opts?.method?.toLowerCase() === 'post';
+      if (Array.isArray(parms)) {
+        parms = Object.fromEntries(parms.map(k => [k, {}]));
       }
 
-      await app[opts?.method || 'get'](routeName,
-        route(
-          tag,
-          summary,
-          routes[routeName] ?? summary,
-          {},
-          (req, reply) => {
-            // handle missing inputs, case-sensitivity, and parameterized routes
-            const src = useBody ? (req.body ?? {}) : (req.query ?? {});
-            const p = [];
-            inputs.forEach((input) => {
-              p.push(
-                input === 'req'
-                  ? req
-                  : input === 'reply'
-                    ? reply
-                    : src[input.toLowerCase()] ?? req.params[input] ?? '',
+      if (typeof query === 'function') {
+        const inputs = query.toString().split('(')[1].split(')')[0].split(/\s*,\s*/).filter((s) => s).map((s) => s.trim());
+        const inputSchema = {};
+        if (!routeName.includes(':')) {
+          for (const f of inputs.filter((input) => input !== 'req' && input !== 'reply')) {
+            inputSchema[f] = 'string';
+          }
+        }
+
+        await app[opts?.method || 'get'](routeName,
+          route(
+            tag,
+            summary,
+            routes[routeName] ?? summary,
+            {},
+            (req, reply) => {
+              // handle missing inputs, case-sensitivity, and parameterized routes
+              const src = useBody ? (req.body ?? {}) : (req.query ?? {});
+              const p = [];
+              inputs.forEach((input) => {
+                p.push(
+                  input === 'req'
+                    ? req
+                    : input === 'reply'
+                      ? reply
+                      : src[input.toLowerCase()] ?? req.params[input] ?? '',
+                );
+              });
+              return query(...p);
+            },
+            {
+              ...inputSchema,
+              ...(parms || {}),
+            },
+            opts,
+          ),
+        );
+      } else {
+        await app[opts?.method || 'get'](routeName,
+          route(
+            tag,
+            summary,
+            routes[routeName] ?? summary,
+            await props(db, query, parms, opts?.db),
+            (req) => {
+              const src = useBody ? (req.body ?? {}) : (req.query ?? {});
+              return simpleQuery(
+                query,
+                Object.keys(parms || req.params).map((parm) => {
+                  if (src[parm.toLowerCase()] !== undefined) {
+                    return src[parm.toLowerCase()];
+                  } else if (req.params[parm]) {
+                    return req.params[parm];
+                  } else if (parms[parm].type === 'array') {
+                    return [];
+                  } else if (parms[parm].type === 'boolean') {
+                    return false;
+                  } else if (parms[parm].format === 'date') {
+                    return null;
+                  } else {
+                    return '';
+                  }
+                }),
+                opts,
               );
-            });
-            return query(...p);
-          },
-          {
-            ...inputSchema,
-            ...(parms || {}),
-          },
-          opts,
-        ),
-      );
-    } else {
-      await app[opts?.method || 'get'](routeName,
-        route(
-          tag,
-          summary,
-          routes[routeName] ?? summary,
-          await props(db, query, parms, opts?.db),
-          (req) => {
-            const src = useBody ? (req.body ?? {}) : (req.query ?? {});
-            return simpleQuery(
-              query,
-              Object.keys(parms || req.params).map((parm) => {
-                if (src[parm.toLowerCase()] !== undefined) {
-                  return src[parm.toLowerCase()];
-                } else if (req.params[parm]) {
-                  return req.params[parm];
-                } else if (parms[parm].type === 'array') {
-                  return [];
-                } else if (parms[parm].type === 'boolean') {
-                  return false;
-                } else if (parms[parm].format === 'date') {
-                  return null;
-                } else {
-                  return '';
-                }
-              }),
-              opts,
-            );
-          },
-          parms,
-          opts,
-        ),
-      );
+            },
+            parms,
+            opts,
+          ),
+        );
+      }
+    } catch (err) {
+      GLOBAL_ERROR.push(err);
     }
   };
 }; // makeSimpleRoute
 
-export { makeSimpleRoute, props, schema200 };
+export { makeSimpleRoute, props, schema200, GLOBAL_ERROR };
