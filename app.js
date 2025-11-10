@@ -21,6 +21,7 @@ const setup = async ({
   trusted = [],
   plugins = {},
   preValidation,
+  onResponse,
 }) => {
   try {
     app = Fastify({
@@ -37,6 +38,10 @@ const setup = async ({
 
     if (preValidation) {
       app.addHook('preValidation', preValidation);
+    }
+
+    if (onResponse) {
+      app.addHook('onResponse', onResponse);
     }
 
     app.addHook('onRequest', async (req, reply) => {
@@ -122,7 +127,8 @@ const setup = async ({
       exposeRoute: true,
     });
 
-    app.setErrorHandler((err, _req, reply) => {
+    app.setErrorHandler((err, req, reply) => {
+      req.log.error({ err });
       if (/password/.test(err.message) || /ECONNREFUSED/.test(err.code)) {
         reply.code(503).send({ error: dberr });
       } else {
@@ -352,6 +358,16 @@ const setup = async ({
     const close = async () => { try { await app.close(); } finally { await pool.end(); process.exit(0); } };
     process.on('SIGINT', close);
     process.on('SIGTERM', close);
+
+    process.on('uncaughtException', err => {
+      console.error('[uncaughtException]', err);
+      // process.exit(1);
+    });
+
+    process.on('unhandledRejection', err => {
+      console.error('[unhandledRejection]', err);
+      // process.exit(1);
+    });
 
     await app.ready();
 
