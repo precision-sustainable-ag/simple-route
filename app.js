@@ -136,6 +136,12 @@ const setup = async ({
       }
     });
 
+    app.addHook('onError', (request, reply, error, done) => {
+      console.error('Error on route:', request.raw.url);
+      console.error(error.stack);
+      done();
+    });
+        
     let url;
     let key;
     await app.register(swaggerUI, {
