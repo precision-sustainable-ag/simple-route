@@ -2,6 +2,7 @@ import { networkInterfaces } from 'os';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import ajvFormats from 'ajv-formats';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
@@ -26,13 +27,19 @@ const setup = async ({
   try {
     app = Fastify({
       logger: false,
+      trustProxy: true,
       routerOptions: {
         ignoreTrailingSlash: true,
       },
       ajv: {
         customOptions: {
           removeAdditional: false,
+          allErrors: true,   // collect ALL errors, not just first
+          verbose: true,     // include schema paths etc.
+          strict: false,     // relax if you use non-strict schemas
+          messages: true,
         },
+        plugins: [ajvFormats], // add date-time, email, uri, etc.
       },
     });
 
@@ -128,7 +135,29 @@ const setup = async ({
     });
 
     app.setErrorHandler((err, req, reply) => {
-      req.log.error({ err });
+      if (err.validation) {
+        const details = err.validation.map(e => ({
+          location: err.validationContext || 'unknown',   // 'querystring' | 'params' | 'body' | 'headers'
+          keyword: e.keyword,                              // e.g. 'required', 'type', 'format'
+          message: e.message,                              // human message
+          instancePath: e.instancePath,                    // JSON pointer to where it failed
+          missingProperty: e.params?.missingProperty,      // for 'required'
+          schemaPath: e.schemaPath,                        // ajv schema path
+        }));
+
+        const src = req.headers.origin || req.headers.referer || req.headers;
+        if (src) {
+          details[0].host = new URL(src).hostname;
+        }
+        details[0].headers = req.headers;
+
+        return reply.code(400).send({
+          error: 'ValidationError',
+          message: 'Request validation failed',
+          details,
+        });
+      }      
+
       if (/password/.test(err.message) || /ECONNREFUSED/.test(err.code)) {
         reply.code(503).send({ error: dberr });
       } else {
@@ -141,7 +170,7 @@ const setup = async ({
       console.error(error.stack);
       done();
     });
-        
+
     let url;
     let key;
     await app.register(swaggerUI, {
