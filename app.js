@@ -136,27 +136,31 @@ const setup = async ({
 
     app.setErrorHandler((err, req, reply) => {
       if (err.validation) {
-        const details = err.validation.map(e => ({
-          location: err.validationContext || 'unknown',   // 'querystring' | 'params' | 'body' | 'headers'
-          keyword: e.keyword,                              // e.g. 'required', 'type', 'format'
-          message: e.message,                              // human message
-          instancePath: e.instancePath,                    // JSON pointer to where it failed
-          missingProperty: e.params?.missingProperty,      // for 'required'
-          schemaPath: e.schemaPath,                        // ajv schema path
-        }));
+        try {
+          const host = req.headers.origin || req.headers.referer || req.headers;
+          const details = err.validation.map((e) => ({
+            location: err.validationContext || 'unknown',    // 'querystring' | 'params' | 'body' | 'headers'
+            keyword: e.keyword,                              // e.g. 'required', 'type', 'format'
+            message: e.message,                              // human message
+            instancePath: e.instancePath,                    // JSON pointer to where it failed
+            missingProperty: e.params?.missingProperty,      // for 'required'
+            schemaPath: e.schemaPath,                        // ajv schema path
+            host,
+          }));
 
-        const src = req.headers.origin || req.headers.referer || req.headers;
-        if (src) {
-          details[0].host = new URL(src).hostname;
+          return reply.code(400).send({
+            error: 'ValidationError',
+            message: 'Request validation failed',
+            details,
+          });
+        } catch (err) {
+          return reply.code(400).send({
+            error: 'ValidationError',
+            message: 'Request validation failed',
+            details: err,
+          });
         }
-        details[0].headers = req.headers;
-
-        return reply.code(400).send({
-          error: 'ValidationError',
-          message: 'Request validation failed',
-          details,
-        });
-      }      
+      }
 
       if (/password/.test(err.message) || /ECONNREFUSED/.test(err.code)) {
         reply.code(503).send({ error: dberr });
