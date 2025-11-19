@@ -46,7 +46,6 @@ const html = (out, opts) => {
           border: 1px solid black;
           border-spacing: 0; 
           empty-cells: show;
-          overflow: hidden;
         }
 
         tr {
@@ -65,7 +64,7 @@ const html = (out, opts) => {
           position: sticky;
           top: 0;
           z-index: 2;
-          border-bottom: 1px solid #aaa;
+          border-bottom: 1px solid #777;
         }
 
         tr.even {
