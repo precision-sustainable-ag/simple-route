@@ -160,13 +160,13 @@ const props = async (db, query, parms) => {
       });
 
       results = await db.query(
-        `${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 0`,
+        `SELECT * FROM (${query}) alias LIMIT 0`,
         p,
       );
 
       if (results.fields.find((field) => field.dataTypeID === 3802)) { // jsonb
         results = await db.query(
-          `${query.trim().replace(/LIMIT\s+\d+/, '')} LIMIT 1`,
+          `SELECT * FROM (${query}) alias LIMIT 1`,
           p,
         );
       }
