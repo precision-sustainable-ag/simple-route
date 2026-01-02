@@ -35,11 +35,15 @@ const pgTypeToJson = (oid, data) => {
   }
 };
 
-const html = (out, opts) => {
+const html = (out, opts, graph) => {
   if (!out.length) {
     return 'No data found';
   } else {
     return (`
+      <meta charset="UTF-8">
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/cash/8.1.3/cash.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
       <style>
         table {
           font: 13px arial;
@@ -65,6 +69,7 @@ const html = (out, opts) => {
           top: 0;
           z-index: 2;
           border-bottom: 1px solid #777;
+          cursor: pointer;
         }
 
         tr.even {
@@ -90,16 +95,157 @@ const html = (out, opts) => {
           /* position: absolute; */
           z-index: 1000;
         }
+        
+        #close-chart {
+          position: absolute;
+          right: 10vw;
+          top: 5vh;
+          padding: 6px 12px;
+          font-size: 14px;
+          cursor: pointer;
+        }
+
+        #chart-canvas {
+          width: 100%;
+          height: 100%;
+        }
+
+        #chart-modal {
+          display:none;
+          position:fixed;
+          inset:0;
+          background:rgba(0,0,0,.4);
+          padding:40px;
+          z-index:10000;
+        }
+
+        #chart-modal > div {
+          background:white;
+          margin:auto;
+          padding:20px;
+          max-width:80vw;
+          max-height:80vh;
+          border-radius:8px;
+        }
       </style>
 
       <table id="Data">
         <thead>
-          <tr><th>${Object.keys(out[0]).join('<th>')}</tr>
+          ${graph
+        ? `
+          <tr>
+            <th>${Object.keys(out[0]).map((col) => `<span class="graph-icon" style="cursor:pointer; margin-left:6px;">📈</span>`).join('<th>')}
+          </tr>
+        `
+        : ''
+      }
+          <tr class="header-row">
+            <th>${Object.keys(out[0]).join('<th>')}
+          </tr>
         </thead>
         <tbody>
           ${out.map((r) => `<tr><td>${Object.keys(r).map((v) => r[v]).join('<td>')}`).join('\n')}
         </tbody>
       </table>
+
+      <div id="chart-modal">
+        <div>
+          <canvas id="chart-canvas"></canvas>
+          <button id="close-chart">Close</button>
+        </div>
+      </div>
+
+      <script>
+        let chart;
+
+        const showChartModal = (label, dates, values) => {
+          $('#chart-modal').show();
+
+          if (chart) chart.destroy();
+
+          const ctx = document.getElementById('chart-canvas').getContext('2d');
+          chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: dates,
+              datasets: [{
+                label,
+                data: values,
+                borderWidth: 2,
+                fill: false,
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+            }
+          });
+        }; // showChartModal
+
+        $('#close-chart').on('click', () => $('#chart-modal').hide());
+
+        $(document).on('keydown', (e) => {
+          if (e.key === 'Escape') {
+            $('#chart-modal').hide();
+          }
+        });
+
+        const drawColumnChart = (colIndex) => {
+          const rows = $('#Data tbody tr').get();
+
+          const dates = [];
+          const values = [];
+
+          rows.forEach(r => {
+            const d = r.cells[0].innerText.trim();
+            const v = r.cells[colIndex].innerText.trim();
+            dates.push(d);
+            values.push(parseFloat(v) || null);
+          });
+
+          showChartModal($('#Data .header-row th').eq(colIndex).text(), dates, values);
+        }; // drawColumnChart
+
+        $(document).on('click', '.graph-icon', function (e) {
+          const th = $(this).closest('th')[0];
+          const colIndex = th.cellIndex;
+          drawColumnChart(colIndex);
+        });
+
+        $(document).on('click', '.header-row th', function () {
+          const th = $(this);
+          const cellIndex = this.cellIndex;
+          const tbody = $('#Data tbody');
+          const rows = tbody.children('tr').get();
+
+          const wasAsc = th.hasClass('sorted-asc');
+          const newDir = wasAsc ? 'desc' : 'asc';
+
+          $('.header-row th').each(function () {
+            this.textContent = this.textContent.replace(/[▲▼]/g, '').trim();
+            this.classList.remove('sorted-asc', 'sorted-desc');
+          });
+
+          if (newDir === 'asc') {
+            th.addClass('sorted-asc');
+            th.text(th.text().trim() + ' ▲');
+          } else {
+            th.addClass('sorted-desc');
+            th.text(th.text().trim() + ' ▼');
+          }
+
+          rows.sort((a, b) => {
+            const valA = a.cells[cellIndex].innerText;
+            const valB = b.cells[cellIndex].innerText;
+            
+            const cmp = /^date/.test(th.text()) ? valA.localeCompare(valB, undefined, { numeric: true }) : valA - valB;
+            return newDir === 'asc' ? cmp : -cmp;
+          });
+
+          tbody.append(rows);
+        });      
+      </script>
 
       ${opts.rowspan ? `
         <script>
@@ -391,7 +537,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
           return out;
         } else if (req.query?.output === 'html' && Array.isArray(out)) {
           reply.type('text/html');
-          return html(out, opts);
+          return html(out, opts, req.query.options?.includes('graph'));
         } else if (req.query?.output === 'csv' && Array.isArray(out)) {
           reply.type('text/csv');
           if (!out.length) {
