@@ -134,7 +134,7 @@ const html = (out, opts, graph) => {
           ${graph
         ? `
           <tr>
-            <th>${Object.keys(out[0]).map((col) => `<span class="graph-icon" style="cursor:pointer; margin-left:6px;">📈</span>`).join('<th>')}
+            <th>${Object.keys(out[0]).map(() => `<span class="graph-icon" style="cursor:pointer; margin-left:6px;">📈</span>`).join('<th>')}
           </tr>
         `
         : ''
@@ -239,7 +239,12 @@ const html = (out, opts, graph) => {
             const valA = a.cells[cellIndex].innerText;
             const valB = b.cells[cellIndex].innerText;
             
-            const cmp = /^date/.test(th.text()) ? valA.localeCompare(valB, undefined, { numeric: true }) : valA - valB;
+            const cmp = /^date/i.test(th.text())
+              ? valA.localeCompare(valB, undefined, { numeric: true })
+              : !isNaN(valA) && !isNaN(valB)
+                ? valA - valB
+                : valA.localeCompare(valB);
+            console.log(valA, typeof (+valA));
             return newDir === 'asc' ? cmp : -cmp;
           });
 
