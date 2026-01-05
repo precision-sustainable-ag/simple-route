@@ -393,9 +393,11 @@ const setup = async ({
       lastModified: true,
     });
 
-    app.setNotFoundHandler((req, reply) => {
-      if (req.raw.url.startsWith('/')) reply.redirect('/redoc');
-    });    
+    const indexPath = path.join(process.cwd(), 'public', 'index.html');
+    const hasIndex = fs.existsSync(indexPath);
+    if (!hasIndex) {
+      app.get('/', (_, reply) => reply.redirect('/redoc'));
+    }    
 
     const close = async () => { try { await app.close(); } finally { await pool.end(); process.exit(0); } };
     process.on('SIGINT', close);
