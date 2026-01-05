@@ -134,7 +134,7 @@ const html = (out, opts, graph) => {
           ${graph
         ? `
           <tr>
-            <th>${Object.keys(out[0]).map(() => `<span class="graph-icon" style="cursor:pointer; margin-left:6px;">📈</span>`).join('<th>')}
+            <th>${Object.keys(out[0]).map((col) => /^(date|lat|lon|predicted)$/i.test(col) ? '' : `<span class="graph-icon" style="cursor:pointer; margin-left:6px;">📈</span>`).join('<th>')}
           </tr>
         `
         : ''
