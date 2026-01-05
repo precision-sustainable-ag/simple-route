@@ -383,7 +383,6 @@ const setup = async ({
     });
 
     await app.register(staticPlugin, {
-      // root: path.join(__dirname, '../public'),
       root: path.join(process.cwd(), 'public'),
       prefix: '/',
       index: ['index.html'],
@@ -393,6 +392,10 @@ const setup = async ({
       etag: true,
       lastModified: true,
     });
+
+    app.setNotFoundHandler((req, reply) => {
+      if (req.raw.url.startsWith('/')) reply.redirect('/redoc');
+    });    
 
     const close = async () => { try { await app.close(); } finally { await pool.end(); process.exit(0); } };
     process.on('SIGINT', close);
