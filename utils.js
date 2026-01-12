@@ -353,7 +353,15 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
     if (opts.array) {
       return rows.map((row) => row[fields[0].name]);
     } else if (opts.object) {
-      return rows[0];
+      if (opts.excludeNulls) {
+        return Object.fromEntries(
+          fields
+            .map(f => [f.name, rows[0][f.name]])
+            .filter(([, v]) => v != null),
+        );
+      } else {
+        return rows[0];
+      }
     } else {
       return rows;
     }
