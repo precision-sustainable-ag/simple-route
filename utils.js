@@ -36,6 +36,32 @@ const pgTypeToJson = (oid, data) => {
 };
 
 const html = (out, opts, graph) => {
+  const functions = (rec, col) => (
+    rec[col] && opts?.htmlFunctions?.[col]
+      ? opts.htmlFunctions[col](rec[col])
+      : rec[col] === null
+        ? ''
+        : rec[col]
+  );
+
+  const colors = (col) => (
+    opts?.htmlColors?.[col]
+      ? `color: ${opts.htmlColors[col]};`
+      : ''
+  );
+
+  const backgrounds = (col) => (
+    opts?.htmlBackgrounds?.[col]
+      ? `background: ${opts.htmlBackgrounds[col]};`
+      : ''
+  );
+
+  const widths = (col) => (
+    opts?.htmlWidths?.[col]
+      ? `min-width: ${opts.htmlWidths[col]}; white-space: wrap;`
+      : ''
+  );
+
   if (!out.length) {
     return 'No data found';
   } else {
@@ -144,7 +170,15 @@ const html = (out, opts, graph) => {
           </tr>
         </thead>
         <tbody>
-          ${out.map((r) => `<tr><td>${Object.keys(r).map((v) => r[v]).join('<td>')}`).join('\n')}
+          ${out.map((r) => `
+            <tr>
+              ${Object.keys(r).map((col) => `
+                <td style="${colors(col)} ${backgrounds(col)} ${widths(col)}">
+                  ${functions(r, col)}
+                </td>
+              `).join('')}
+            </tr>
+          `).join('\n')}
         </tbody>
       </table>
 
