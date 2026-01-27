@@ -44,27 +44,22 @@ const html = (out, opts, graph) => {
         : rec[col]
   );
 
-  const colors = (col) => (
-    opts?.htmlColors?.[col]
-      ? `color: ${opts.htmlColors[col]};`
-      : ''
-  );
-
-  const backgrounds = (col) => (
-    opts?.htmlBackgrounds?.[col]
-      ? `background: ${opts.htmlBackgrounds[col]};`
-      : ''
-  );
-
-  const widths = (col) => (
-    opts?.htmlWidths?.[col]
-      ? `min-width: ${opts.htmlWidths[col]}; white-space: wrap;`
-      : ''
-  );
-
   if (!out.length) {
     return 'No data found';
   } else {
+    const style = (type, prop) => {
+      if (!type) return '';
+      
+      const cols = Object.keys(out[0]);
+
+      return Object.keys(type).map((col) => (`
+        td:nth-child(${cols.indexOf(col) + 1}) {
+          ${prop}: ${type[col]};
+          ${prop === 'min-width' ? 'white-space: normal;' : ''}
+        }
+      `)).join('');
+    };
+
     return (`
       <meta charset="UTF-8">
       <script src="https://cdnjs.cloudflare.com/ajax/libs/cash/8.1.3/cash.min.js"></script>
@@ -88,6 +83,10 @@ const html = (out, opts, graph) => {
           border-bottom: 1px solid #bbb;
           white-space: nowrap;
         }
+
+        ${style(opts?.htmlColors, 'color')}
+        ${style(opts?.htmlBackgrounds, 'background')}
+        ${style(opts?.htmlWidths, 'min-width')}
 
         th {
           background: #eee;
@@ -173,7 +172,7 @@ const html = (out, opts, graph) => {
           ${out.map((r) => `
             <tr>
               ${Object.keys(r).map((col) => `
-                <td style="${colors(col)} ${backgrounds(col)} ${widths(col)}">
+                <td>
                   ${functions(r, col)}
                 </td>
               `).join('')}
