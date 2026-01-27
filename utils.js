@@ -60,6 +60,27 @@ const html = (out, opts, graph) => {
       `)).join('');
     };
 
+    let buttons = '';
+    let buttonFunctions = '';
+    if (opts?.htmlButtons) {
+      const b = Object.keys(opts?.htmlButtons);
+      buttons = b.map((s) => `
+        <button data-button="${s}">
+          ${s}
+        </button>
+      `).join('');
+
+      buttonFunctions = b.map((s) => (`
+        ${s}: ${opts?.htmlButtons[s]}
+      `)).join(',\n');
+
+      buttonFunctions = `
+        const bf = {
+          ${buttonFunctions}
+        }
+      `;
+    }
+
     return (`
       <meta charset="UTF-8">
       <script src="https://cdnjs.cloudflare.com/ajax/libs/cash/8.1.3/cash.min.js"></script>
@@ -154,6 +175,8 @@ const html = (out, opts, graph) => {
         }
       </style>
 
+      ${buttons}
+
       <table id="Data">
         <thead>
           ${graph
@@ -189,6 +212,8 @@ const html = (out, opts, graph) => {
       </div>
 
       <script>
+        ${buttonFunctions}
+
         let chart;
 
         const showChartModal = (label, dates, values) => {
@@ -240,6 +265,10 @@ const html = (out, opts, graph) => {
           showChartModal($('#Data .header-row th').eq(colIndex).text(), dates, values);
         }; // drawColumnChart
 
+        $(document).on('click', 'button', function() {
+          bf[$(this).data('button')]();
+        });
+
         $(document).on('click', '.graph-icon', function (e) {
           const th = $(this).closest('th')[0];
           const colIndex = th.cellIndex;
@@ -271,18 +300,25 @@ const html = (out, opts, graph) => {
           rows.sort((a, b) => {
             const valA = a.cells[cellIndex].innerText;
             const valB = b.cells[cellIndex].innerText;
-            
+
+            const emptyA = valA === '';
+            const emptyB = valB === '';
+            if (emptyA || emptyB) {
+              if (emptyA && emptyB) return 0;
+              return emptyA ? 1 : -1; // empties last, always
+            }            
+
             const cmp = /^date/i.test(th.text())
               ? valA.localeCompare(valB, undefined, { numeric: true })
               : !isNaN(valA) && !isNaN(valB)
                 ? valA - valB
                 : valA.localeCompare(valB);
-            console.log(valA, typeof (+valA));
+
             return newDir === 'asc' ? cmp : -cmp;
           });
 
           tbody.append(rows);
-        });      
+        });
       </script>
 
       ${opts.rowspan ? `
