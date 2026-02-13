@@ -28,6 +28,7 @@ const setup = async ({
   try {
     app = Fastify({
       logger: false,
+      pluginTimeout: 60000,
       trustProxy: true,
       routerOptions: {
         ignoreTrailingSlash: true,
