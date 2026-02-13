@@ -1,3 +1,3 @@
-export { makeSimpleRoute, props, schema200 } from './utils.js';
+export { app, setup } from './app.js';
 export { pool } from './db.js';
-export { setup, app } from './app.js';
+export { makeSimpleRoute, props, schema200 } from './utils.js';

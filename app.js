@@ -1,14 +1,15 @@
-import { networkInterfaces } from 'os';
 import fs from 'node:fs';
+import { networkInterfaces } from 'node:os';
 import path from 'node:path';
 
-import ajvFormats from 'ajv-formats';
-import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import staticPlugin from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
-import staticPlugin from '@fastify/static';
+
+import ajvFormats from 'ajv-formats';
 import { load } from 'cheerio';
+import Fastify from 'fastify';
 
 import { pool } from './db.js';
 import { GLOBAL_ERROR } from './utils.js';
@@ -34,9 +35,9 @@ const setup = async ({
       ajv: {
         customOptions: {
           removeAdditional: false,
-          allErrors: true,   // collect ALL errors, not just first
-          verbose: true,     // include schema paths etc.
-          strict: false,     // relax if you use non-strict schemas
+          allErrors: true, // collect ALL errors, not just first
+          verbose: true, // include schema paths etc.
+          strict: false, // relax if you use non-strict schemas
           messages: true,
         },
         plugins: [ajvFormats], // add date-time, email, uri, etc.
@@ -51,13 +52,18 @@ const setup = async ({
       app.addHook('onResponse', onResponse);
     }
 
-    app.addHook('onRequest', async (req, reply) => {
+    app.addHook('onRequest', async (_req, reply) => {
       if (GLOBAL_ERROR.length) {
-        reply.type('text/plain').send(GLOBAL_ERROR.map((e) => e.message + '\n' + e.stack + '\n' + '_'.repeat(100)).join('\n'));
+        reply
+          .type('text/plain')
+          .send(GLOBAL_ERROR.map((e) => `${e.message}\n${e.stack}\n${'_'.repeat(100)}`).join('\n'));
       }
     });
-    
-    const ipAddress = () => Object.values(networkInterfaces()).flat().find(i => i && i.family === 'IPv4' && !i.internal)?.address || '127.0.0.1';
+
+    const ipAddress = () =>
+      Object.values(networkInterfaces())
+        .flat()
+        .find((i) => i && i.family === 'IPv4' && !i.internal)?.address || '127.0.0.1';
 
     const dberr = `Could not connect to database from ${ipAddress()}`;
 
@@ -67,7 +73,7 @@ const setup = async ({
       credentials: true,
     });
 
-    const cleanHTML = (s) => (
+    const cleanHTML = (s) =>
       s
         .replace(/\$ANCHOR\[(.+)\]/g, (_, c) => {
           const cs = c.replace(/(\w+=)/g, (_, c) => `<em style="color: brown">${c}</em>`);
@@ -78,19 +84,17 @@ const setup = async ({
             </div>
           `;
         })
-        .replace(/\s*[\n\r]+/g, '\r')  // Redoc doesn't like blank rows
-      // .replace(/\$PATH/g, '?????'),
-    );
+        .replace(/\s*[\n\r]+/g, '\r'); // Redoc doesn't like blank rows
+    // .replace(/\$PATH/g, '?????'),
 
     try {
       const html = fs.readFileSync(path.join(process.cwd(), 'public', 'routes.html'), 'utf8');
       const $ = load(cleanHTML(html));
 
       routes = Object.fromEntries(
-        $('[data-route]').toArray().map((el) => [
-          el.attribs['data-route'],
-          $(el).html()?.trim() ?? '',
-        ]),
+        $('[data-route]')
+          .toArray()
+          .map((el) => [el.attribs['data-route'], $(el).html()?.trim() ?? '']),
       );
     } catch (err) {
       console.log(err);
@@ -98,7 +102,9 @@ const setup = async ({
 
     let description;
     try {
-      description = cleanHTML(fs.readFileSync(path.join(process.cwd(), 'public', 'description.html'), 'utf8'));
+      description = cleanHTML(
+        fs.readFileSync(path.join(process.cwd(), 'public', 'description.html'), 'utf8'),
+      );
     } catch (err) {
       console.log(err);
     }
@@ -139,12 +145,12 @@ const setup = async ({
         try {
           const host = req.headers.origin || req.headers.referer || req.headers;
           const details = err.validation.map((e) => ({
-            location: err.validationContext || 'unknown',    // 'querystring' | 'params' | 'body' | 'headers'
-            keyword: e.keyword,                              // e.g. 'required', 'type', 'format'
-            message: e.message,                              // human message
-            instancePath: e.instancePath,                    // JSON pointer to where it failed
-            missingProperty: e.params?.missingProperty,      // for 'required'
-            schemaPath: e.schemaPath,                        // ajv schema path
+            location: err.validationContext || 'unknown', // 'querystring' | 'params' | 'body' | 'headers'
+            keyword: e.keyword, // e.g. 'required', 'type', 'format'
+            message: e.message, // human message
+            instancePath: e.instancePath, // JSON pointer to where it failed
+            missingProperty: e.params?.missingProperty, // for 'required'
+            schemaPath: e.schemaPath, // ajv schema path
             host,
           }));
 
@@ -169,7 +175,7 @@ const setup = async ({
       }
     });
 
-    app.addHook('onError', (request, reply, error, done) => {
+    app.addHook('onError', (request, _reply, error, done) => {
       console.error('Error on route:', request.raw.url);
       console.error(error.stack);
       done();
@@ -195,7 +201,9 @@ const setup = async ({
               const res = await fetch(url, { headers: { 'x-api-key': key } });
               const ct = (res.headers.get('content-type') || '').toLowerCase();
               const isHtmlOrCsv = /output=(html|csv)/.test(url) || /csv|html/.test(ct);
-              const text = isHtmlOrCsv ? await res.text() : JSON.stringify(await res.json(), null, 2);
+              const text = isHtmlOrCsv
+                ? await res.text()
+                : JSON.stringify(await res.json(), null, 2);
 
               const w = window.open('about:blank', '_blank');
               if (!w) {
@@ -247,7 +255,7 @@ const setup = async ({
             } // openResultInWindow
 
             if (e?.target.classList.contains('execute') && e.ctrlKey) {
-              const current =  e?.target.closest('.opblock');
+              const current = e?.target.closest('.opblock');
               if (current.querySelector('.opblock-summary-method').textContent !== 'GET') {
                 return;
               }
@@ -262,7 +270,7 @@ const setup = async ({
               }, 50);
             } else {
               setTimeout(() => {
-                const current =  e?.srcElement.closest('.opblock-summary');
+                const current = e?.srcElement.closest('.opblock-summary');
                 if (current) current.closest('.opblock').scrollIntoView();
               }, 100);
             }
@@ -275,15 +283,18 @@ const setup = async ({
       },
       theme: {
         title,
-        favicon: [{
-          filename: 'favicon.ico',
-          rel: 'icon',
-          sizes: 'any',
-          type: 'image/x-icon',
-          content: ico,
-        }],
-        css: [{
-          content: `
+        favicon: [
+          {
+            filename: 'favicon.ico',
+            rel: 'icon',
+            sizes: 'any',
+            type: 'image/x-icon',
+            content: ico,
+          },
+        ],
+        css: [
+          {
+            content: `
             .swagger-ui .topbar,
             .url,
             button.cancel,
@@ -321,7 +332,8 @@ const setup = async ({
               }
             }
           `,
-        }],
+          },
+        ],
       },
     });
 
@@ -329,7 +341,7 @@ const setup = async ({
       await app.register(plugin, { prefix: `/${name}` });
     }
 
-    app.get('/redoc', async (req, reply) => {
+    app.get('/redoc', async (_req, reply) => {
       const html = `
         <!doctype html>
         <html>
@@ -397,18 +409,25 @@ const setup = async ({
     const hasIndex = fs.existsSync(indexPath);
     if (!hasIndex) {
       app.get('/', (_, reply) => reply.redirect('/redoc'));
-    }    
+    }
 
-    const close = async () => { try { await app.close(); } finally { await pool.end(); process.exit(0); } };
+    const close = async () => {
+      try {
+        await app.close();
+      } finally {
+        await pool.end();
+        process.exit(0);
+      }
+    };
     process.on('SIGINT', close);
     process.on('SIGTERM', close);
 
-    process.on('uncaughtException', err => {
+    process.on('uncaughtException', (err) => {
       console.error('[uncaughtException]', err);
       // process.exit(1);
     });
 
-    process.on('unhandledRejection', err => {
+    process.on('unhandledRejection', (err) => {
       console.error('[unhandledRejection]', err);
       // process.exit(1);
     });
@@ -423,7 +442,7 @@ const setup = async ({
   } catch (err) {
     const port = Number(process.env.APP_PORT) || 80;
     app = Fastify();
-    app.addHook('onRequest', async (req, reply) => {
+    app.addHook('onRequest', async (_req, reply) => {
       reply.type('text/plain').send(GLOBAL_ERROR ? GLOBAL_ERROR.message : err.message);
     });
     app.listen({ port, host: '0.0.0.0' });

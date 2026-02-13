@@ -9,6 +9,6 @@ export const pool = new Pool({
   host: process.env.DB_HOST,
   database: process.env.DB_DATABASE,
   port: process.env.DB_PORT,
-  ssl: process.env.DB_SSL === 'false' ? false : true,
+  ssl: process.env.DB_SSL !== 'false',
   connectionTimeoutMillis: Number(process.env.DB_CONN_TIMEOUT_MS) || 5000,
 });
