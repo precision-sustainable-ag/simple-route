@@ -507,7 +507,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
       ? {
           body: {
             type: 'object',
-            additionalProperties: false,
+            additionalProperties: opts.additionalProperties || false,
             properties: { ...bodyProps },
             ...(required.length ? { required } : {}),
           },
