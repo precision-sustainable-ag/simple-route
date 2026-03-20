@@ -647,6 +647,10 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
         let out = await handler(req, reply);
         if (out === undefined) out = props;
 
+        if (opts?.statusCode) {
+          reply.code(opts.statusCode);
+        }
+
         if (opts.html || opts?.respondAsHtmlWhen?.(req)) {
           reply.type('text/html');
           return out;
