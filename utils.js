@@ -1,5 +1,5 @@
 import { networkInterfaces } from 'node:os';
-
+import ExcelJS from 'exceljs';
 import { routes } from './app.js';
 
 const GLOBAL_ERROR = [];
@@ -496,7 +496,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
     for (const k of required) delete parameters[k].required;
 
     if (!opts.object && !opts.array && !opts.html) {
-      parameters.output = { type: 'string', examples: ['json', 'csv', 'html'] };
+      parameters.output = { type: 'string', examples: ['json', 'csv', 'html', 'xlsx'] };
     }
 
     const useBody = opts?.method?.toLowerCase() === 'post';
@@ -657,19 +657,50 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
         } else if (req.query?.output === 'html' && Array.isArray(out)) {
           reply.type('text/html');
           return html(out, opts, req.query.options?.includes('graph'));
-        } else if (req.query?.output === 'csv' && Array.isArray(out)) {
-          reply.type('text/csv');
-          if (!out.length) {
-            return '';
-          } else {
-            const s = `${Object.keys(out[0]).toString()}\n${out
-              .map((r) =>
-                Object.keys(r).map((v) => (r[v]?.toString().includes(',') ? `"${r[v]}"` : r[v])),
-              )
-              .join('\n')}`;
+        } else if (/csv$/.test(req.query?.output) && Array.isArray(out)) {
+          if (!out.length) return '';
 
-            return s;
-          }
+          const raw = req.query.output;
+          const filename =
+            raw.toLowerCase() === 'csv' ? 'output.csv' : raw.replace(/[^\w.-]/g, '_'); // sanitize
+
+          reply
+            .type('text/csv')
+            .header('Content-Disposition', `attachment; filename="${filename}"`);
+
+          const s = `${Object.keys(out[0]).toString()}\n${out
+            .map((r) =>
+              Object.keys(r).map((v) => (r[v]?.toString().includes(',') ? `"${r[v]}"` : r[v])),
+            )
+            .join('\n')}`;
+
+          return s;
+        } else if (/xlsx$/.test(req.query?.output) && Array.isArray(out)) {
+          if (!out.length) return '';
+
+          const raw = req.query.output;
+          const filename =
+            raw.toLowerCase() === 'xlsx' ? 'output.xlsx' : raw.replace(/[^\w.-]/g, '_'); // sanitize
+
+          const wb = new ExcelJS.Workbook();
+          const ws = wb.addWorksheet('Sheet1');
+
+          // headers
+          ws.columns = Object.keys(out[0]).map((key) => ({
+            header: key,
+            key,
+          }));
+
+          // rows
+          ws.addRows(out);
+
+          const buffer = await wb.xlsx.writeBuffer();
+
+          reply
+            .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            .header('Content-Disposition', `attachment; filename="${filename}"`);
+
+          return buffer;
         } else {
           return out;
         }
