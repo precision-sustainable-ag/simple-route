@@ -1,5 +1,5 @@
 import { networkInterfaces } from 'node:os';
-import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import { routes } from './app.js';
 
 const GLOBAL_ERROR = [];
@@ -675,26 +675,23 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
             .join('\n')}`;
 
           return s;
-        } else if (/xlsx$/.test(req.query?.output) && Array.isArray(out)) {
+        } else if (/xlsx$/i.test(req.query?.output) && Array.isArray(out)) {
           if (!out.length) return '';
 
           const raw = req.query.output;
+
           const filename =
             raw.toLowerCase() === 'xlsx' ? 'output.xlsx' : raw.replace(/[^\w.-]/g, '_'); // sanitize
 
-          const wb = new ExcelJS.Workbook();
-          const ws = wb.addWorksheet('Sheet1');
+          const wb = XLSX.utils.book_new();
+          const ws = XLSX.utils.json_to_sheet(out);
 
-          // headers
-          ws.columns = Object.keys(out[0]).map((key) => ({
-            header: key,
-            key,
-          }));
+          XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
 
-          // rows
-          ws.addRows(out);
-
-          const buffer = await wb.xlsx.writeBuffer();
+          const buffer = XLSX.write(wb, {
+            type: 'buffer',
+            bookType: 'xlsx',
+          });
 
           reply
             .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

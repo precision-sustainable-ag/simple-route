@@ -27,14 +27,11 @@
     "@fastify/static": "^9.1.1",
     "ajv-formats": "^3.0.1",
     "cheerio": "^1.1.2",
-    "exceljs": "^4.4.0",
     "fastify": "^5.7.4",
-    "globals": "^16.4.0"
+    "globals": "^16.4.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.15"
-  },
-  "overrides": {
-    "uuid": "^14.0.0"
   }
 }
