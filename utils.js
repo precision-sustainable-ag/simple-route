@@ -515,7 +515,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
       : {
           querystring: {
             type: 'object',
-            additionalProperties: false,
+            additionalProperties: opts.type || false,
             properties: { ...bodyProps },
             ...(required.length ? { required } : {}),
           },
@@ -594,6 +594,16 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
         opts.response[200].properties = { ...items.properties };
         opts.response[200].additionalProperties = false;
       }
+    }
+
+    if (opts.type) {
+      opts.response = {
+        200: {
+          type: 'object',
+          additionalProperties: isEmpty,
+          properties: { ...properties },
+        },
+      };
     }
 
     const successSchema =
@@ -706,6 +716,15 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
   }; // route
 
   return async function simpleRoute(routeName, tag, summary, query, parms, opts) {
+    if (pluginOpts?.type) {
+      opts = {
+        ...(opts || {}),
+        type: pluginOpts.type,
+        additional: pluginOpts.additional,
+        meta: pluginOpts.meta,
+      };
+    }
+
     try {
       const useBody = opts?.method?.toLowerCase() === 'post';
       if (Array.isArray(parms)) {
@@ -734,7 +753,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
             summary,
             routes[routeName] ?? summary,
             {},
-            (req, reply) => {
+            async (req, reply) => {
               // handle missing inputs, case-sensitivity, and parameterized routes
               const src = useBody ? (req.body ?? {}) : (req.query ?? {});
               const p = [];
@@ -747,7 +766,40 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
                       : (src[input.toLowerCase()] ?? req.params[input] ?? ''),
                 );
               });
-              return query(...p);
+
+              const data = await query(...p);
+
+              if (opts?.type) {
+                let meta;
+
+                if (opts?.meta) {
+                  meta = Object.fromEntries(
+                    Object.entries({
+                      ...opts.meta,
+                      ...req.query,
+                      ...req.params,
+                    }).map(([key, value]) => [key, Number.isFinite(+value) ? +value : value]),
+                  );
+
+                  if (opts.records || pluginOpts?.meta?.records) {
+                    meta.records = data.length;
+                  }
+                }
+
+                const additional = { ...opts?.additional };
+                if (opts?.callback) {
+                  await opts.callback({ data, additional });
+                }
+
+                return {
+                  type: Array.isArray(data) ? 'array' : 'object',
+                  data,
+                  ...(additional || {}),
+                  meta,
+                };
+              } else {
+                return data;
+              }
             },
             {
               ...inputSchema,

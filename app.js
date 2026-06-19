@@ -80,7 +80,6 @@ const setup = async ({
           const cs = c.replace(/(\w+=)/g, (_, c) => `<em style="color: brown">${c}</em>`);
           return `
             <div style="white-space: nowrap; overflow: auto;">
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
               <strong><a target="_blank" href="${c}">${cs}</a></strong>
             </div>
           `;
