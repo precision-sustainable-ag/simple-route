@@ -5,7 +5,9 @@ import pg from 'pg';
 const { Pool } = pg;
 
 const database =
-  os.hostname() === '20.241.231.202' ? 'develop_species_selector' : process.env.DB_DATABASE;
+  os.hostname() === 'developapi.covercrop-selector.org'
+    ? 'develop_species_selector'
+    : process.env.DB_DATABASE;
 
 export const pool = new Pool({
   user: process.env.DB_USERNAME,
