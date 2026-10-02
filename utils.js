@@ -788,7 +788,7 @@ const makeSimpleRoute = (app, db, pluginOpts = {}) => {
 
                 const additional = { ...opts?.additional };
                 if (opts?.callback) {
-                  await opts.callback({ data, additional });
+                  await opts.callback({ data, additional, req });
                 }
 
                 return {
