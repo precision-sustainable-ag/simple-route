@@ -386,7 +386,7 @@ const setup = async ({
               >
               </redoc>
             </div>
-            <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+            <script src="https://cdn.redoc.ly/redoc/v2.5.0/bundles/redoc.standalone.js"></script>
           </body>
         </html>
       `;
