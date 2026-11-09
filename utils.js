@@ -227,16 +227,16 @@ const html = (out, opts, graph) => {
           ${out
             .map(
               (r) => `
-            <tr>
-              ${Object.keys(r)
-                .map(
-                  (col) => `
-                <td>
-                  ${functions(r, col)}
-                </td>
-              `,
-                )
-                .join('')}
+              <tr ${opts?.htmlRowBackground?.(r) ? `style="background: ${opts.htmlRowBackground(r)}"` : ''}>
+                ${Object.keys(r)
+                  .map(
+                    (col) => `
+                  <td>
+                    ${functions(r, col)}
+                  </td>
+                `,
+                  )
+                  .join('')}
             </tr>
           `,
             )
