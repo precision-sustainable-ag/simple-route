@@ -231,7 +231,7 @@ const html = (out, opts, graph) => {
                 ${Object.keys(r)
                   .map(
                     (col) => `
-                  <td>
+                  <td style="background: ${opts?.htmlCellBackground?.(r, col, r[col]) ?? 'inherit'}">
                     ${functions(r, col)}
                   </td>
                 `,
